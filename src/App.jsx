@@ -7,6 +7,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const AUTH_KEY = "finanze_auth";
 const THEME_KEY = "finanze_theme";
+const BIOMETRIC_KEY = "finanze_biometric";
+
 const DEFAULT_CATEGORIES = ["Stipendio","Affitto","Spesa","Trasporti","Ristoranti","Svago","Salute","Abbigliamento","Bollette","Risparmi","Altro"];
 const COLORS = ["#1a56db","#0e9f6e","#e3a008","#e02424","#7e3af2","#3f83f8","#f05252","#0694a2","#ff5a1f","#6875f5"];
 
@@ -18,6 +20,48 @@ function hashPassword(p) {
 
 function fmt(n) {
   return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n);
+}
+
+async function registerBiometric(userHash) {
+  try {
+    const challenge = new Uint8Array(32);
+    crypto.getRandomValues(challenge);
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { name: "Finanze Personali" },
+        user: { id: new TextEncoder().encode(userHash), name: "utente", displayName: "Utente" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+        timeout: 60000,
+      }
+    });
+    if (cred) {
+      localStorage.setItem(BIOMETRIC_KEY, JSON.stringify({ id: Array.from(new Uint8Array(cred.rawId)) }));
+      return true;
+    }
+  } catch(e) { console.log("Biometric reg failed", e); }
+  return false;
+}
+
+async function authenticateBiometric() {
+  try {
+    const stored = localStorage.getItem(BIOMETRIC_KEY);
+    if (!stored) return false;
+    const { id } = JSON.parse(stored);
+    const challenge = new Uint8Array(32);
+    crypto.getRandomValues(challenge);
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        allowCredentials: [{ id: new Uint8Array(id), type: "public-key" }],
+        userVerification: "required",
+        timeout: 60000,
+      }
+    });
+    return !!assertion;
+  } catch(e) { console.log("Biometric auth failed", e); }
+  return false;
 }
 
 function PieChart({ data, dark }) {
@@ -43,7 +87,7 @@ function PieChart({ data, dark }) {
         {slices.map((s, i) => (
           <div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:13}}>
             <span style={{width:12,height:12,borderRadius:2,background:s.color,flexShrink:0}}/>
-            <span style={{color:dark?"#d1d5db":"#374151",minWidth:100}}>{s.label}</span>
+            <span style={{color:dark?"#d1d5db":"#374151",minWidth:80}}>{s.label}</span>
             <span style={{color:dark?"#6b7280":"#9ca3af"}}>{s.pct}%</span>
             <span style={{fontWeight:600,color:dark?"#f9fafb":"#111827",marginLeft:4}}>{fmt(s.value)}</span>
           </div>
@@ -67,6 +111,9 @@ export default function App() {
   const [showAddConto, setShowAddConto] = useState(false);
   const [showAddTx, setShowAddTx] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricRegistered, setBiometricRegistered] = useState(false);
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
   const [nuovoConto, setNuovoConto] = useState({ nome:"", colore: COLORS[0] });
   const [nuovaTx, setNuovaTx] = useState({ tipo:"uscita", importo:"", categoria:"Altro", descrizione:"", data: new Date().toISOString().split("T")[0], contoId:"" });
 
@@ -80,6 +127,14 @@ export default function App() {
   const headerBg = d ? "#0f172a" : "#1e3a5f";
   const tabActiveColor = d ? "#3b82f6" : "#1e3a5f";
 
+  const inputStyle = { width:"100%", boxSizing:"border-box", padding:"8px 12px", border:`1px solid ${border}`, borderRadius:6, fontSize:14, marginBottom:10, color:textPrimary, background:surface };
+  const selectStyle = { ...inputStyle, appearance:"auto" };
+  const cardStyle = { background:surface, borderRadius:8, border:`1px solid ${border}`, padding:"1.5rem", marginBottom:16 };
+  const btnStyle = { padding:"8px 18px", borderRadius:6, border:`1px solid ${border}`, background:surface, cursor:"pointer", fontSize:13, fontWeight:500, color:textPrimary };
+  const btnPrimary = { padding:"8px 18px", borderRadius:6, border:"none", background:"#1a56db", cursor:"pointer", fontSize:13, fontWeight:500, color:"#fff" };
+  const modalStyle = { position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:100 };
+  const modalBox = { background:surface, borderRadius:10, padding:"1.75rem", width:"min(360px, 90vw)", boxShadow:"0 20px 60px rgba(0,0,0,0.3)", border:`1px solid ${border}` };
+
   function toggleTheme() {
     const next = !dark;
     setDark(next);
@@ -87,9 +142,19 @@ export default function App() {
   }
 
   useEffect(() => {
-    const hash = localStorage.getItem(AUTH_KEY);
-    if (hash) { setUserHash(hash); loadData(hash); }
-    else setScreen("setup");
+    const init = async () => {
+      try {
+        if (window.PublicKeyCredential) {
+          const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+          setBiometricAvailable(available);
+          setBiometricRegistered(!!localStorage.getItem(BIOMETRIC_KEY));
+        }
+      } catch(e) {}
+      const hash = localStorage.getItem(AUTH_KEY);
+      if (hash) { setUserHash(hash); setScreen("login"); }
+      else setScreen("setup");
+    };
+    init();
   }, []);
 
   async function loadData(hash) {
@@ -115,15 +180,24 @@ export default function App() {
 
   async function handleLogin() {
     const h = hashPassword(pwInput);
-    setLoading(true);
-    const { data } = await supabase.from("conti").select("id").eq("user_hash", h).limit(1);
-    setLoading(false);
     const storedHash = localStorage.getItem(AUTH_KEY);
     if (storedHash && storedHash !== h) { setPwError("Password errata"); return; }
     localStorage.setItem(AUTH_KEY, h);
     setUserHash(h);
     await loadData(h);
     setPwError("");
+    if (biometricAvailable && !biometricRegistered) setShowBiometricPrompt(true);
+  }
+
+  async function handleBiometricLogin() {
+    const success = await authenticateBiometric();
+    if (success) {
+      const hash = localStorage.getItem(AUTH_KEY);
+      setUserHash(hash);
+      await loadData(hash);
+    } else {
+      setPwError("Face ID non riuscito, usa la password");
+    }
   }
 
   async function addConto() {
@@ -145,16 +219,7 @@ export default function App() {
 
   async function addTx() {
     if (!nuovaTx.importo || !nuovaTx.contoId) return;
-    const tx = {
-      id: Date.now().toString(),
-      user_hash: userHash,
-      conto_id: nuovaTx.contoId,
-      tipo: nuovaTx.tipo,
-      importo: parseFloat(nuovaTx.importo),
-      categoria: nuovaTx.categoria,
-      descrizione: nuovaTx.descrizione,
-      data: nuovaTx.data
-    };
+    const tx = { id: Date.now().toString(), user_hash: userHash, conto_id: nuovaTx.contoId, tipo: nuovaTx.tipo, importo: parseFloat(nuovaTx.importo), categoria: nuovaTx.categoria, descrizione: nuovaTx.descrizione, data: nuovaTx.data };
     await supabase.from("transazioni").insert(tx);
     setTransazioni(prev => [{ ...tx, contoId: tx.conto_id }, ...prev]);
     setNuovaTx({ tipo:"uscita", importo:"", categoria:"Altro", descrizione:"", data: new Date().toISOString().split("T")[0], contoId: nuovaTx.contoId });
@@ -181,16 +246,6 @@ export default function App() {
     return Object.entries(map).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
   }
 
-  const inputStyle = { width:"100%", boxSizing:"border-box", padding:"8px 12px", border:`1px solid ${border}`, borderRadius:6, fontSize:14, marginBottom:10, color:textPrimary, background:surface };
-  const selectStyle = { ...inputStyle, appearance:"auto" };
-  const cardStyle = { background:surface, borderRadius:8, border:`1px solid ${border}`, padding:"1.5rem", marginBottom:16 };
-  const btnStyle = { padding:"8px 18px", borderRadius:6, border:`1px solid ${border}`, background:surface, cursor:"pointer", fontSize:13, fontWeight:500, color:textPrimary };
-  const btnPrimary = { padding:"8px 18px", borderRadius:6, border:"none", background:"#1a56db", cursor:"pointer", fontSize:13, fontWeight:500, color:"#fff" };
-  const modalStyle = { position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:100 };
-  const modalBox = { background:surface, borderRadius:10, padding:"1.75rem", width:360, boxShadow:"0 20px 60px rgba(0,0,0,0.3)", border:`1px solid ${border}` };
-
-  const isMobile = window.innerWidth < 640;
-
   if (screen === "loading" || loading) return (
     <div style={{minHeight:"100vh",width:"100%",background:bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}>
       <div style={{width:40,height:40,border:`3px solid ${border}`,borderTop:"3px solid #1a56db",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
@@ -203,16 +258,27 @@ export default function App() {
     const isSetup = screen === "setup";
     return (
       <div style={{minHeight:"100vh",width:"100%",background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
-        <div style={{...cardStyle,width:380,padding:"2.5rem",boxShadow:"0 4px 24px rgba(0,0,0,0.15)"}}>
+        <div style={{...cardStyle,width:"min(380px,90vw)",padding:"2.5rem",boxShadow:"0 4px 24px rgba(0,0,0,0.15)"}}>
           <div style={{textAlign:"center",marginBottom:"2rem"}}>
             <div style={{width:52,height:52,borderRadius:12,background:"#1e3a5f",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:24}}>💰</div>
             <h2 style={{margin:0,fontSize:20,fontWeight:700,color:textPrimary}}>Finanze Personali</h2>
             <p style={{margin:"6px 0 0",fontSize:13,color:textSecondary}}>{isSetup?"Crea la tua password master":"Accedi al tuo account"}</p>
           </div>
+
+          {/* Face ID button - solo in login se registrato */}
+          {!isSetup && biometricAvailable && biometricRegistered && (
+            <button onClick={handleBiometricLogin} style={{width:"100%",padding:"12px",fontSize:15,borderRadius:8,border:`1px solid ${border}`,background:surface,color:textPrimary,cursor:"pointer",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontWeight:500}}>
+              <span style={{fontSize:22}}>🔒</span> Accedi con Face ID
+            </button>
+          )}
+          {!isSetup && biometricAvailable && biometricRegistered && (
+            <div style={{textAlign:"center",fontSize:12,color:textSecondary,marginBottom:12}}>oppure usa la password</div>
+          )}
+
           <input type="password" placeholder="Password" value={pwInput} onChange={e=>{setPwInput(e.target.value);setPwError("");}} onKeyDown={e=>e.key==="Enter"&&(isSetup?handleSetup():handleLogin())} style={inputStyle}/>
           {isSetup && <input type="password" placeholder="Conferma password" value={pwConfirm} onChange={e=>{setPwConfirm(e.target.value);setPwError("");}} onKeyDown={e=>e.key==="Enter"&&handleSetup()} style={inputStyle}/>}
           {pwError && <div style={{fontSize:13,color:"#e02424",marginBottom:10}}>{pwError}</div>}
-          <button onClick={isSetup?handleSetup:handleLogin} style={{...btnPrimary,width:"100%",padding:"10px",fontSize:15}}>{isSetup?"Crea account":"Accedi"}</button>
+          <button onClick={isSetup?handleSetup:handleLogin} style={{...btnPrimary,width:"100%",padding:"10px",fontSize:15}}>{isSetup?"Crea account":"Accedi con password"}</button>
           <div style={{textAlign:"center",marginTop:12}}>
             <button onClick={()=>setScreen(isSetup?"login":"setup")} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:13,color:textSecondary}}>
               {isSetup?"Hai già un account? Accedi":"Non hai un account? Registrati"}
@@ -228,7 +294,6 @@ export default function App() {
 
   return (
     <div style={{minHeight:"100vh",width:"100%",background:bg,fontFamily:"'Segoe UI',system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
-      {/* Header */}
       <div className="header" style={{background:headerBg}}>
         <div style={{width:32,height:32,borderRadius:8,background:"#3b82f6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>💰</div>
         <span className="header-title">Finanze Personali</span>
@@ -241,7 +306,6 @@ export default function App() {
         <button className="header-btn" onClick={()=>{setScreen("login");setPwInput("");setPwError("");}}>Esci</button>
       </div>
 
-      {/* Tabs */}
       <div className="tabbar" style={{background:surface,borderBottom:`1px solid ${border}`}}>
         {["dashboard","transazioni","conti","analisi"].map(t => (
           <button key={t} onClick={()=>setTab(t)} style={{padding:"12px 14px",fontSize:13,fontWeight:tab===t?600:400,color:tab===t?tabActiveColor:textSecondary,border:"none",background:"transparent",borderBottom:tab===t?`2px solid ${tabActiveColor}`:"2px solid transparent",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
@@ -255,7 +319,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Body */}
       <div className="body-pad" style={{flex:1,padding:"2rem",width:"100%",boxSizing:"border-box"}}>
 
         {tab==="dashboard" && (
@@ -277,11 +340,11 @@ export default function App() {
                 return (
                   <div key={tx.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${surfaceAlt}`}}>
                     <div style={{width:36,height:36,borderRadius:8,background:(c?.colore||"#1a56db")+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{tx.tipo==="entrata"?"↑":"↓"}</div>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:14,fontWeight:500,color:textPrimary}}>{tx.descrizione||tx.categoria}</div>
-                      <div style={{fontSize:12,color:textSecondary}}>{tx.categoria} · {tx.data} · {c?.nome}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:14,fontWeight:500,color:textPrimary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tx.descrizione||tx.categoria}</div>
+                      <div style={{fontSize:12,color:textSecondary}}>{tx.categoria} · {tx.data}</div>
                     </div>
-                    <div style={{fontWeight:700,fontSize:15,color:tx.tipo==="entrata"?"#0e9f6e":"#e02424"}}>{tx.tipo==="entrata"?"+":"-"}{fmt(tx.importo)}</div>
+                    <div style={{fontWeight:700,fontSize:14,color:tx.tipo==="entrata"?"#0e9f6e":"#e02424",flexShrink:0}}>{tx.tipo==="entrata"?"+":"-"}{fmt(tx.importo)}</div>
                   </div>
                 );
               })}
@@ -299,13 +362,12 @@ export default function App() {
               return (
                 <div key={tx.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:`1px solid ${surfaceAlt}`}}>
                   <div style={{width:36,height:36,borderRadius:8,background:(c?.colore||"#1a56db")+"33",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>{tx.tipo==="entrata"?"↑":"↓"}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:14,fontWeight:500,color:textPrimary}}>{tx.descrizione||tx.categoria}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:500,color:textPrimary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tx.descrizione||tx.categoria}</div>
                     <div style={{fontSize:12,color:textSecondary}}>{tx.categoria} · {tx.data} · {c?.nome}</div>
                   </div>
-                  <span style={{display:"inline-block",padding:"2px 10px",borderRadius:12,fontSize:11,fontWeight:600,background:tx.tipo==="entrata"?"#0e9f6e22":"#e0242222",color:tx.tipo==="entrata"?"#0e9f6e":"#e02424"}}>{tx.tipo}</span>
-                  <div style={{fontWeight:700,color:tx.tipo==="entrata"?"#0e9f6e":"#e02424",minWidth:90,textAlign:"right"}}>{tx.tipo==="entrata"?"+":"-"}{fmt(tx.importo)}</div>
-                  <button onClick={()=>deleteTx(tx.id)} style={{background:"transparent",border:"none",cursor:"pointer",color:textSecondary,fontSize:18,lineHeight:1,padding:"0 4px"}}>×</button>
+                  <div style={{fontWeight:700,color:tx.tipo==="entrata"?"#0e9f6e":"#e02424",fontSize:14,flexShrink:0}}>{tx.tipo==="entrata"?"+":"-"}{fmt(tx.importo)}</div>
+                  <button onClick={()=>deleteTx(tx.id)} style={{background:"transparent",border:"none",cursor:"pointer",color:textSecondary,fontSize:18,lineHeight:1,padding:"0 4px",flexShrink:0}}>×</button>
                 </div>
               );
             })}
@@ -325,7 +387,7 @@ export default function App() {
                 <button onClick={()=>{if(window.confirm("Eliminare questo conto?"))deleteConto(c.id);}} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #fca5a5",background:surface,cursor:"pointer",fontSize:12,color:"#e02424"}}>Elimina</button>
               </div>
             ))}
-            {conti.length===0 && <div style={{...cardStyle,gridColumn:"span 3",textAlign:"center",color:textSecondary,fontSize:13}}>Nessun conto. Crea il tuo primo conto con "+ Conto".</div>}
+            {conti.length===0 && <div style={{...cardStyle,gridColumn:"span 3",textAlign:"center",color:textSecondary,fontSize:13}}>Nessun conto. Usa "+ Conto" per iniziare.</div>}
           </div>
         )}
 
@@ -337,6 +399,27 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* Modal: Attiva Face ID */}
+      {showBiometricPrompt && (
+        <div style={modalStyle}>
+          <div style={modalBox}>
+            <div style={{textAlign:"center",marginBottom:16}}>
+              <div style={{fontSize:48,marginBottom:8}}>🔒</div>
+              <h3 style={{margin:"0 0 8px",fontWeight:700,fontSize:17,color:textPrimary}}>Attiva Face ID</h3>
+              <p style={{fontSize:13,color:textSecondary,margin:0}}>Vuoi usare Face ID per accedere più velocemente la prossima volta?</p>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <button onClick={async()=>{
+                const ok = await registerBiometric(userHash);
+                if(ok) setBiometricRegistered(true);
+                setShowBiometricPrompt(false);
+              }} style={{...btnPrimary,width:"100%",padding:"10px"}}>Attiva Face ID</button>
+              <button onClick={()=>setShowBiometricPrompt(false)} style={{...btnStyle,width:"100%",padding:"10px"}}>Non ora</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Nuovo conto */}
       {showAddConto && (
