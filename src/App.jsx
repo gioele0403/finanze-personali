@@ -189,6 +189,8 @@ export default function App() {
   const modalStyle = { position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:100 };
   const modalBox = { background:surface, borderRadius:10, padding:"1.75rem", width:360, boxShadow:"0 20px 60px rgba(0,0,0,0.3)", border:`1px solid ${border}` };
 
+  const isMobile = window.innerWidth < 640;
+
   if (screen === "loading" || loading) return (
     <div style={{minHeight:"100vh",width:"100%",background:bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}>
       <div style={{width:40,height:40,border:`3px solid ${border}`,borderTop:"3px solid #1a56db",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
@@ -227,38 +229,38 @@ export default function App() {
   return (
     <div style={{minHeight:"100vh",width:"100%",background:bg,fontFamily:"'Segoe UI',system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
       {/* Header */}
-      <div style={{background:headerBg,padding:"0 2rem",display:"flex",alignItems:"center",height:56,gap:16,flexShrink:0}}>
-        <div style={{width:32,height:32,borderRadius:8,background:"#3b82f6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>💰</div>
-        <span style={{color:"#fff",fontWeight:600,fontSize:17}}>Finanze Personali</span>
-        <select value={selectedConto} onChange={e=>setSelectedConto(e.target.value)} style={{marginLeft:"auto",padding:"5px 10px",borderRadius:6,border:"1px solid #3b82f6",background:"#1e3a5f",color:"#fff",fontSize:13,cursor:"pointer"}}>
+      <div style={{background:headerBg,padding:"0 1rem",display:"flex",alignItems:"center",height:56,gap:8,flexShrink:0}}>
+        <div style={{width:32,height:32,borderRadius:8,background:"#3b82f6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>💰</div>
+        {!isMobile && <span style={{color:"#fff",fontWeight:600,fontSize:17,whiteSpace:"nowrap"}}>Finanze Personali</span>}
+        <select value={selectedConto} onChange={e=>setSelectedConto(e.target.value)} style={{marginLeft:"auto",padding:"5px 8px",borderRadius:6,border:"1px solid #3b82f6",background:"#1e3a5f",color:"#fff",fontSize:12,cursor:"pointer",maxWidth:120}}>
           <option value="tutti">Tutti i conti</option>
           {conti.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
         </select>
-        <span style={{color:"#93c5fd",fontSize:13,marginLeft:8,fontWeight:600}}>{fmt(saldoTotale)}</span>
-        <button onClick={toggleTheme} style={{padding:"5px 10px",borderRadius:6,border:"1px solid #3b82f6",background:"transparent",color:"#93c5fd",fontSize:13,cursor:"pointer"}}>{dark?"☀️":"🌙"}</button>
-        <button onClick={()=>{setScreen("login");setPwInput("");setPwError("");}} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #3b82f6",background:"transparent",color:"#93c5fd",fontSize:12,cursor:"pointer"}}>Esci</button>
+        <span style={{color:"#93c5fd",fontSize:12,fontWeight:600,whiteSpace:"nowrap"}}>{fmt(saldoTotale)}</span>
+        <button onClick={toggleTheme} style={{padding:"5px 8px",borderRadius:6,border:"1px solid #3b82f6",background:"transparent",color:"#93c5fd",fontSize:13,cursor:"pointer",flexShrink:0}}>{dark?"☀️":"🌙"}</button>
+        <button onClick={()=>{setScreen("login");setPwInput("");setPwError("");}} style={{padding:"5px 8px",borderRadius:6,border:"1px solid #3b82f6",background:"transparent",color:"#93c5fd",fontSize:11,cursor:"pointer",flexShrink:0}}>Esci</button>
       </div>
 
       {/* Tabs */}
-      <div style={{background:surface,borderBottom:`1px solid ${border}`,padding:"0 2rem",display:"flex",flexShrink:0}}>
+      <div style={{background:surface,borderBottom:`1px solid ${border}`,padding:"0 0.5rem",display:"flex",flexShrink:0,overflowX:"auto"}}>
         {["dashboard","transazioni","conti","analisi"].map(t => (
-          <button key={t} onClick={()=>setTab(t)} style={{padding:"14px 20px",fontSize:14,fontWeight:tab===t?600:400,color:tab===t?tabActiveColor:textSecondary,border:"none",background:"transparent",borderBottom:tab===t?`2px solid ${tabActiveColor}`:"2px solid transparent",cursor:"pointer"}}>
+          <button key={t} onClick={()=>setTab(t)} style={{padding:isMobile?"10px 12px":"14px 20px",fontSize:isMobile?12:14,fontWeight:tab===t?600:400,color:tab===t?tabActiveColor:textSecondary,border:"none",background:"transparent",borderBottom:tab===t?`2px solid ${tabActiveColor}`:"2px solid transparent",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
             {t.charAt(0).toUpperCase()+t.slice(1)}
           </button>
         ))}
         <div style={{flex:1}}/>
-        <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
-          <button onClick={()=>setShowAddConto(true)} style={btnStyle}>+ Conto</button>
-          <button onClick={()=>{setShowAddTx(true);setNuovaTx(x=>({...x,contoId:selectedConto!=="tutti"?selectedConto:conti[0]?.id||""}));}} style={btnPrimary}>+ Transazione</button>
+        <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 4px",flexShrink:0}}>
+          <button onClick={()=>setShowAddConto(true)} style={{...btnStyle,padding:"6px 10px",fontSize:12}}>+ Conto</button>
+          <button onClick={()=>{setShowAddTx(true);setNuovaTx(x=>({...x,contoId:selectedConto!=="tutti"?selectedConto:conti[0]?.id||""}));}} style={{...btnPrimary,padding:"6px 10px",fontSize:12}}>+ Transazione</button>
         </div>
       </div>
 
       {/* Body */}
-      <div style={{flex:1,padding:"2rem",width:"100%",boxSizing:"border-box"}}>
+      <div style={{flex:1,padding:isMobile?"1rem":"2rem",width:"100%",boxSizing:"border-box"}}>
 
         {tab==="dashboard" && (
           <div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,marginBottom:20}}>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:12,marginBottom:16}}>
               {[{label:"Saldo",val:entrate-uscite,color:"#1a56db"},{label:"Entrate",val:entrate,color:"#0e9f6e"},{label:"Uscite",val:uscite,color:"#e02424"}].map((m,i)=>(
                 <div key={i} style={{...cardStyle,marginBottom:0,borderLeft:`4px solid ${m.color}`}}>
                   <div style={{fontSize:11,color:textSecondary,textTransform:"uppercase",letterSpacing:0.8,fontWeight:500,marginBottom:6}}>{m.label}</div>
@@ -311,7 +313,7 @@ export default function App() {
         )}
 
         {tab==="conti" && (
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
+          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:16}}>
             {conti.map(c=>(
               <div key={c.id} style={{...cardStyle,borderTop:`4px solid ${c.colore}`,marginBottom:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
