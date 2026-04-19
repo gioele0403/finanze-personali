@@ -13,3 +13,93 @@ html, body, #root {
 body {
   overflow-x: hidden;
 }
+
+.header {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  gap: 8px;
+  padding: 0 1rem;
+  flex-shrink: 0;
+}
+
+.header-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.tabbar {
+  display: flex;
+  flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.grid-conti {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.header-btn {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid #3b82f6;
+  background: transparent;
+  color: #93c5fd;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .header-title {
+    display: none;
+  }
+
+  .header {
+    gap: 6px;
+    padding: 0 0.75rem;
+  }
+
+  .header-btn {
+    font-size: 11px;
+    padding: 4px 7px;
+  }
+
+  .grid-3 {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .grid-conti {
+    grid-template-columns: 1fr;
+  }
+
+  .tab-actions {
+    gap: 4px;
+    padding: 6px 4px;
+  }
+
+  .body-pad {
+    padding: 1rem !important;
+  }
+}

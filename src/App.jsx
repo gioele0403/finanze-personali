@@ -229,38 +229,38 @@ export default function App() {
   return (
     <div style={{minHeight:"100vh",width:"100%",background:bg,fontFamily:"'Segoe UI',system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
       {/* Header */}
-      <div style={{background:headerBg,padding:"0 1rem",display:"flex",alignItems:"center",height:56,gap:8,flexShrink:0}}>
+      <div className="header" style={{background:headerBg}}>
         <div style={{width:32,height:32,borderRadius:8,background:"#3b82f6",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>💰</div>
-        {!isMobile && <span style={{color:"#fff",fontWeight:600,fontSize:17,whiteSpace:"nowrap"}}>Finanze Personali</span>}
-        <select value={selectedConto} onChange={e=>setSelectedConto(e.target.value)} style={{marginLeft:"auto",padding:"5px 8px",borderRadius:6,border:"1px solid #3b82f6",background:"#1e3a5f",color:"#fff",fontSize:12,cursor:"pointer",maxWidth:120}}>
+        <span className="header-title">Finanze Personali</span>
+        <select value={selectedConto} onChange={e=>setSelectedConto(e.target.value)} style={{marginLeft:"auto",padding:"5px 8px",borderRadius:6,border:"1px solid #3b82f6",background:"#1e3a5f",color:"#fff",fontSize:12,cursor:"pointer",maxWidth:130}}>
           <option value="tutti">Tutti i conti</option>
           {conti.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
         </select>
         <span style={{color:"#93c5fd",fontSize:12,fontWeight:600,whiteSpace:"nowrap"}}>{fmt(saldoTotale)}</span>
-        <button onClick={toggleTheme} style={{padding:"5px 8px",borderRadius:6,border:"1px solid #3b82f6",background:"transparent",color:"#93c5fd",fontSize:13,cursor:"pointer",flexShrink:0}}>{dark?"☀️":"🌙"}</button>
-        <button onClick={()=>{setScreen("login");setPwInput("");setPwError("");}} style={{padding:"5px 8px",borderRadius:6,border:"1px solid #3b82f6",background:"transparent",color:"#93c5fd",fontSize:11,cursor:"pointer",flexShrink:0}}>Esci</button>
+        <button className="header-btn" onClick={toggleTheme}>{dark?"☀️":"🌙"}</button>
+        <button className="header-btn" onClick={()=>{setScreen("login");setPwInput("");setPwError("");}}>Esci</button>
       </div>
 
       {/* Tabs */}
-      <div style={{background:surface,borderBottom:`1px solid ${border}`,padding:"0 0.5rem",display:"flex",flexShrink:0,overflowX:"auto"}}>
+      <div className="tabbar" style={{background:surface,borderBottom:`1px solid ${border}`}}>
         {["dashboard","transazioni","conti","analisi"].map(t => (
-          <button key={t} onClick={()=>setTab(t)} style={{padding:isMobile?"10px 12px":"14px 20px",fontSize:isMobile?12:14,fontWeight:tab===t?600:400,color:tab===t?tabActiveColor:textSecondary,border:"none",background:"transparent",borderBottom:tab===t?`2px solid ${tabActiveColor}`:"2px solid transparent",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
+          <button key={t} onClick={()=>setTab(t)} style={{padding:"12px 14px",fontSize:13,fontWeight:tab===t?600:400,color:tab===t?tabActiveColor:textSecondary,border:"none",background:"transparent",borderBottom:tab===t?`2px solid ${tabActiveColor}`:"2px solid transparent",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>
             {t.charAt(0).toUpperCase()+t.slice(1)}
           </button>
         ))}
         <div style={{flex:1}}/>
-        <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 4px",flexShrink:0}}>
+        <div className="tab-actions">
           <button onClick={()=>setShowAddConto(true)} style={{...btnStyle,padding:"6px 10px",fontSize:12}}>+ Conto</button>
-          <button onClick={()=>{setShowAddTx(true);setNuovaTx(x=>({...x,contoId:selectedConto!=="tutti"?selectedConto:conti[0]?.id||""}));}} style={{...btnPrimary,padding:"6px 10px",fontSize:12}}>+ Transazione</button>
+          <button onClick={()=>{setShowAddTx(true);setNuovaTx(x=>({...x,contoId:selectedConto!=="tutti"?selectedConto:conti[0]?.id||""}));}} style={{...btnPrimary,padding:"6px 10px",fontSize:12}}>+ Tx</button>
         </div>
       </div>
 
       {/* Body */}
-      <div style={{flex:1,padding:isMobile?"1rem":"2rem",width:"100%",boxSizing:"border-box"}}>
+      <div className="body-pad" style={{flex:1,padding:"2rem",width:"100%",boxSizing:"border-box"}}>
 
         {tab==="dashboard" && (
           <div>
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:12,marginBottom:16}}>
+            <div className="grid-3">
               {[{label:"Saldo",val:entrate-uscite,color:"#1a56db"},{label:"Entrate",val:entrate,color:"#0e9f6e"},{label:"Uscite",val:uscite,color:"#e02424"}].map((m,i)=>(
                 <div key={i} style={{...cardStyle,marginBottom:0,borderLeft:`4px solid ${m.color}`}}>
                   <div style={{fontSize:11,color:textSecondary,textTransform:"uppercase",letterSpacing:0.8,fontWeight:500,marginBottom:6}}>{m.label}</div>
@@ -313,7 +313,7 @@ export default function App() {
         )}
 
         {tab==="conti" && (
-          <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:16}}>
+          <div className="grid-conti">
             {conti.map(c=>(
               <div key={c.id} style={{...cardStyle,borderTop:`4px solid ${c.colore}`,marginBottom:0}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
