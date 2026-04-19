@@ -12,6 +12,12 @@ html, body, #root {
 
 body {
   overflow-x: hidden;
+  background: #0f172a;
+}
+
+.header {
+  padding-top: env(safe-area-inset-top);
+  height: calc(56px + env(safe-area-inset-top));
 }
 
 .header {
