@@ -161,7 +161,7 @@ export default function App() {
     setLoading(true);
     const [{ data: c }, { data: t }] = await Promise.all([
       supabase.from("conti").select("*").eq("user_hash", hash),
-      supabase.from("transazioni").select("*").eq("user_hash", hash).order("data", { ascending: false })
+      supabase.from("transazioni").select("*").eq("user_hash", hash).order("data", { ascending: false }).order("id", { ascending: false })
     ]);
     setConti(c || []);
     setTransazioni((t || []).map(tx => ({ ...tx, contoId: tx.conto_id })));
@@ -332,7 +332,10 @@ export default function App() {
               ))}
             </div>
             <div style={cardStyle}>
-              <p style={{fontSize:15,fontWeight:600,color:tabActiveColor,margin:"0 0 12px"}}>Ultime transazioni</p>
+              <div style={{display:"flex",alignItems:"center",marginBottom:12}}>
+                <p style={{fontSize:15,fontWeight:600,color:tabActiveColor,margin:0}}>Ultime transazioni</p>
+                <button onClick={()=>loadData(userHash)} style={{marginLeft:"auto",padding:"4px 12px",borderRadius:6,border:`1px solid ${border}`,background:surface,cursor:"pointer",fontSize:12,color:textSecondary,display:"flex",alignItems:"center",gap:4}}>↻ Aggiorna</button>
+              </div>
               <div style={{borderTop:`1px solid ${border}`,marginBottom:12}}/>
               {txFiltered.length===0 && <div style={{color:textSecondary,fontSize:13}}>Nessuna transazione ancora.</div>}
               {txFiltered.slice(0,8).map(tx=>{

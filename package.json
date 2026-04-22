@@ -13,7 +13,6 @@
     "build:app": "vite build && electron-builder"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.103.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
@@ -28,16 +27,12 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
-    "vite": "^8.0.4",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite": "^8.0.4"
   },
   "build": {
     "appId": "com.finanze.personali",
     "productName": "Finanze Personali",
-    "files": [
-      "dist/**/*",
-      "electron.cjs"
-    ],
+    "files": ["dist/**/*", "electron.cjs", "preload.cjs", "widget.html", "public/apple-touch-icon.png"],
     "win": {
       "target": "nsis",
       "icon": "public/vite.svg"

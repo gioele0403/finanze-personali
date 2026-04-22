@@ -12,7 +12,7 @@ export default defineConfig({
         short_name: 'Finanze',
         description: 'Gestisci le tue finanze personali',
         theme_color: '#1e3a5f',
-        background_color: '#f3f4f6',
+        background_color: '#111827',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -28,4 +28,7 @@ export default defineConfig({
     })
   ],
   base: './',
+  optimizeDeps: {
+    include: ['@supabase/supabase-js']
+  }
 })
